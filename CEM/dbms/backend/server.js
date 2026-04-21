@@ -7,8 +7,14 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Support for both a full connection string or individual components
-const dbConfig = process.env.DATABASE_URL || process.env.MYSQL_URL || {
+// Detect if any variable contains a full connection string
+const connectionString = [
+    process.env.DATABASE_URL,
+    process.env.MYSQL_URL,
+    process.env.DB_HOST // Sometimes users put the full URL here
+].find(v => v && v.startsWith('mysql://'));
+
+const dbConfig = connectionString || {
     host: process.env.DB_HOST,
     port: process.env.DB_PORT,
     user: process.env.DB_USER,
