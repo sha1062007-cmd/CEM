@@ -4,7 +4,22 @@ const cors = require('cors');
 require('dotenv').config();
 
 const app = express();
-app.use(cors());
+const allowedOrigins = [
+    process.env.FRONTEND_URL,
+    process.env.FRONTEND_URL_2,
+    'http://localhost:5173',
+    'http://localhost:3000'
+].filter(Boolean);
+
+app.use(cors({
+    origin: (origin, callback) => {
+        // Allow server-to-server requests and local tooling without an Origin header.
+        if (!origin || allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        return callback(new Error('Not allowed by CORS'));
+    }
+}));
 app.use(express.json());
 
 // Detect if any variable contains a full connection string
@@ -14,13 +29,16 @@ const connectionString = [
     process.env.DB_HOST // Sometimes users put the full URL here
 ].find(v => v && v.startsWith('mysql://'));
 
+// Only use SSL if we are NOT on localhost
+const isLocal = !connectionString && (process.env.DB_HOST === 'localhost' || !process.env.DB_HOST);
+
 const dbConfig = connectionString || {
     host: process.env.DB_HOST,
     port: process.env.DB_PORT,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
-    ssl: { rejectUnauthorized: false }
+    ssl: isLocal ? false : { rejectUnauthorized: false }
 };
 
 const db = mysql.createConnection(dbConfig);
@@ -65,7 +83,7 @@ app.post('/api/clubs', (req, res) => {
 app.post('/api/events', (req, res) => {
     const { club_id, title, description, event_date, location, capacity } = req.body;
     const query = 'INSERT INTO events (club_id, title, description, event_date, location, capacity) VALUES (?, ?, ?, ?, ?, ?)';
-    
+
     db.query(query, [club_id, title, description, event_date, location, capacity], (err, results) => {
         if (err) {
             console.error('Error inserting event:', err);
